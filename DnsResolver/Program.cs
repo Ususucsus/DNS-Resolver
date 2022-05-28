@@ -59,9 +59,14 @@ async Task Listen()
             {
                 var requestedDomain = question.Name;
                 var requestedType = question.Type;
-
+                
                 logger.Information("Requested resolve for {Type} {Domain} ", requestedType, requestedDomain);
 
+                if (requestedType != RecordType.A)
+                {
+                    throw new NotSupportedException("Resolving supported only for A records");
+                }
+                
                 var microCache = new Dictionary<string, IPAddress>();
 
                 try
@@ -73,7 +78,7 @@ async Task Listen()
                 catch (ResolveFailedException e)
                 {
                     response.ResponseCode = ResponseCode.Refused;
-                    logger.Warning("{Type} {Domain} resolve failed", requestedType, requestedDomain);
+                    logger.Warning(e, "{Type} {Domain} resolve failed", requestedType, requestedDomain);
                 }
             }
 

@@ -56,9 +56,22 @@ public sealed class SafeDnsResolver
             .Select(x => x.IPAddress)
             .ToList();
 
+        var soaDomains = response.AuthorityRecords
+            .Where(x => x.Type == RecordType.SOA)
+            .OfType<StartOfAuthorityResourceRecord>()
+            .Select(x => x.MasterDomainName.ToString())
+            .ToList();
+
         if (domainIpAddresses.Count == 0)
         {
-            throw new ResolveFailedException("No A records");
+            if (soaDomains.Count == 0)
+            {
+                throw new ResolveFailedException("No A records");
+            }
+            else
+            {
+                return authorityIpAddress;
+            }
         }
 
         var domainIpAddress = domainIpAddresses.First();
