@@ -11,7 +11,7 @@ public class DnsClient
 
     private static readonly Dictionary<(string, IPAddress), Response> Cache = new();
     private readonly ILogger _logger;
-    
+
     public DnsClient()
     {
         _logger = Log.Logger.ForContext<DnsClient>();
@@ -21,7 +21,7 @@ public class DnsClient
 
     public async Task<Response> SendAsync(Request request, IPAddress ipAddress)
     {
-        var serializedRequest = SerializeRequest(request);        
+        var serializedRequest = SerializeRequest(request);
         Requests++;
         var timeoutCancellationTokenSource = new CancellationTokenSource(Timeout);
 
@@ -49,10 +49,19 @@ public class DnsClient
         await tcpStream.FlushAsync(timeoutCancellationTokenSource.Token);
 
         var responseSizeBytes = new byte[2];
-        await tcpStream.ReadAsync(responseSizeBytes, timeoutCancellationTokenSource.Token);
+
+        if (await tcpStream.ReadAsync(responseSizeBytes, timeoutCancellationTokenSource.Token) != 2)
+        {
+            throw new ResolveFailedException("Read few bytes");
+        }
+
         var responseSize = (short)(responseSizeBytes[0] << 8 | responseSizeBytes[1]);
         var responseBytes = new byte[responseSize];
-        await tcpStream.ReadAsync(responseBytes, timeoutCancellationTokenSource.Token);
+        if (await tcpStream.ReadAsync(responseBytes, timeoutCancellationTokenSource.Token) != responseSize)
+        {
+            throw new ResolveFailedException("Read few bytes");
+        }
+
         var response = Response.FromArray(responseBytes);
 
         Cache[(serializedRequest, ipAddress)] = response;
