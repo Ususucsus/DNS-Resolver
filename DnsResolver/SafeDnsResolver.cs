@@ -62,6 +62,11 @@ public sealed class SafeDnsResolver
         var request = BuildRequest(domain, RecordType.A);
         var response = await _dnsClient.SendAsync(request, authorityIpAddress);
 
+        if (response.ResponseCode != ResponseCode.NoError)
+        {
+            throw new ResolveFailedException(response.ResponseCode.ToString());
+        }
+
         var domainIpAddresses = response.AnswerRecords
             .Where(x => x.Type == type)
             .OfType<IPAddressResourceRecord>()
@@ -121,6 +126,11 @@ public sealed class SafeDnsResolver
 
             var request = BuildRequest(domainPart, RecordType.NS);
             var response = await _dnsClient.SendAsync(request, namespaceServer);
+
+            if (response.ResponseCode != ResponseCode.NoError)
+            {
+                throw new ResolveFailedException(response.ResponseCode.ToString());
+            }
 
             var authorityDomainsFromAuthorityRecords = response.AuthorityRecords
                 .Where(x => x.Type == RecordType.NS)
