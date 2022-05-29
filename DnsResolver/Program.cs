@@ -33,8 +33,10 @@ Dictionary<string, IPAddress> ParseConfig(string configPath)
 var config = ParseConfig(configPath);
 var resolver = new SafeDnsResolver(config);
 
-async void HandleData(byte[] data, UdpClient udp, IPEndPoint remoteEndpoint)
+async void HandleData(byte[] data, UdpClient udp, IPEndPoint? remoteEndpoint)
 {
+    ArgumentNullException.ThrowIfNull(remoteEndpoint);
+
     try
     {
         var request = Request.FromArray(data);

@@ -11,7 +11,19 @@ public sealed class SafeDnsResolver
 
     private static readonly IPAddress[] RootNamespaceServers =
     {
-        IPAddress.Parse("198.41.0.4")
+        IPAddress.Parse("198.41.0.4"),
+        IPAddress.Parse("199.9.14.201"),
+        IPAddress.Parse("192.33.4.12"),
+        IPAddress.Parse("199.7.91.13"),
+        IPAddress.Parse("192.203.230.10"),
+        IPAddress.Parse("192.5.5.241"),
+        IPAddress.Parse("192.112.36.4"),
+        IPAddress.Parse("198.97.190.53"),
+        IPAddress.Parse("192.36.148.17"),
+        IPAddress.Parse("192.58.128.30"),
+        IPAddress.Parse("193.0.14.129"),
+        IPAddress.Parse("199.7.83.42"),
+        IPAddress.Parse("202.12.27.33")
     };
 
     private readonly DnsClient _dnsClient = new();
@@ -74,7 +86,7 @@ public sealed class SafeDnsResolver
             }
         }
 
-        var domainIpAddress = domainIpAddresses.First();
+        var domainIpAddress = ChooseRandom(domainIpAddresses);
 
         return domainIpAddress;
     }
@@ -157,7 +169,7 @@ public sealed class SafeDnsResolver
             return (authorityDomains, authorityIpAddresses, soaDomains, cnameDomains);
         }
 
-        var currentAuthorityIpAddress = RootNamespaceServers.First();
+        var currentAuthorityIpAddress = ChooseRandom(RootNamespaceServers);
         foreach (var part in parts)
         {
             var (authorityDomains, authorityIpAddresses, soaDomains, cnameDomains) =
@@ -165,7 +177,7 @@ public sealed class SafeDnsResolver
 
             if (authorityIpAddresses.Count != 0)
             {
-                var authorityIpAddress = authorityIpAddresses.First();
+                var authorityIpAddress = ChooseRandom(authorityIpAddresses);
                 currentAuthorityIpAddress = authorityIpAddress;
 
                 _logger.Debug("[{Domain}] Found authority ip address {AuthorityIpAddress}", domain, authorityIpAddress);
@@ -174,7 +186,7 @@ public sealed class SafeDnsResolver
             {
                 if (cnameDomains.Count != 0)
                 {
-                    var cnameDomain = cnameDomains.First();
+                    var cnameDomain = ChooseRandom(cnameDomains);
 
                     if (soaDomains.Count != 0)
                     {
@@ -257,7 +269,7 @@ public sealed class SafeDnsResolver
                             throw new ResolveFailedException();
                         }
 
-                        var authorityDomain = authorityDomains.First();
+                        var authorityDomain = ChooseRandom(authorityDomains);
                         var authorityIpAddress = await Resolve(authorityDomain, microCache);
                         currentAuthorityIpAddress = authorityIpAddress;
 
@@ -306,5 +318,12 @@ public sealed class SafeDnsResolver
             new List<Question> { new(Domain.FromString(domain), recordType) },
             new List<IResourceRecord>()
         );
+    }
+
+    private static T ChooseRandom<T>(IReadOnlyList<T> elements)
+    {
+        var random = new Random();
+        var index = random.Next(elements.Count);
+        return elements[index];
     }
 }
