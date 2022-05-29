@@ -9,9 +9,9 @@ public class DnsClient
 {
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(10);
 
-    private static readonly Dictionary<(Request, IPAddress), Response> Cache = new();
+    private static readonly Dictionary<(string, IPAddress), Response> Cache = new();
     private readonly ILogger _logger;
-
+    
     public DnsClient()
     {
         _logger = Log.Logger.ForContext<DnsClient>();
@@ -21,13 +21,14 @@ public class DnsClient
 
     public async Task<Response> SendAsync(Request request, IPAddress ipAddress)
     {
+        var serializedRequest = SerializeRequest(request);        
         Requests++;
         var timeoutCancellationTokenSource = new CancellationTokenSource(Timeout);
 
-        if (Cache.ContainsKey((request, ipAddress)))
+        if (Cache.ContainsKey((serializedRequest, ipAddress)))
         {
             _logger.Debug("Request to {IpAddress} found in cache", ipAddress);
-            return Cache[(request, ipAddress)];
+            return Cache[(serializedRequest, ipAddress)];
         }
 
         _logger.Debug("Requesting {IpAddress}", ipAddress);
@@ -54,7 +55,12 @@ public class DnsClient
         await tcpStream.ReadAsync(responseBytes, timeoutCancellationTokenSource.Token);
         var response = Response.FromArray(responseBytes);
 
-        Cache[(request, ipAddress)] = response;
+        Cache[(serializedRequest, ipAddress)] = response;
         return response;
+    }
+
+    private static string SerializeRequest(IMessage request)
+    {
+        return string.Join(' ', request.Questions);
     }
 }
