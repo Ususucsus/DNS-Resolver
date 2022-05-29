@@ -31,6 +31,49 @@ Dictionary<string, IPAddress> ParseConfig(string configPath)
 }
 
 var config = ParseConfig(configPath);
+var resolver = new SafeDnsResolver(config);
+
+async void HandleData(byte[] data, UdpClient udp, IPEndPoint remoteEndpoint)
+{
+    try
+    {
+        var request = Request.FromArray(data);
+        var response = Response.FromRequest(request);
+
+        foreach (var question in request.Questions)
+        {
+            var requestedDomain = question.Name;
+            var requestedType = question.Type;
+
+            logger.Information("Requested resolve for {Type} {Domain} ", requestedType, requestedDomain);
+
+            if (requestedType != RecordType.A)
+            {
+                throw new NotSupportedException("Resolving supported only for A records");
+            }
+
+            var microCache = new Dictionary<string, IPAddress>();
+
+            try
+            {
+                var requestedIpAddress = await resolver.Resolve(requestedDomain.ToString(), microCache);
+                response.AnswerRecords.Add(new IPAddressResourceRecord(requestedDomain, requestedIpAddress));
+                logger.Information("{Type} {Domain} resolved", requestedType, requestedDomain);
+            }
+            catch (ResolveFailedException e)
+            {
+                response.ResponseCode = ResponseCode.Refused;
+                logger.Warning(e, "{Type} {Domain} resolve failed", requestedType, requestedDomain);
+            }
+        }
+
+        await udp.SendAsync(response.ToArray(), remoteEndpoint);
+    }
+    catch (Exception e)
+    {
+        logger.Fatal(e, "");
+    }
+}
 
 async Task Listen()
 {
@@ -43,46 +86,13 @@ async Task Listen()
         udp.Client.IOControl(unchecked((int)0x9800000C), new byte[4], new byte[4]);
     }
 
-    var resolver = new SafeDnsResolver(config);
-
-    async void ReceiveCallback(IAsyncResult result)
+    void ReceiveCallback(IAsyncResult result)
     {
         try
         {
             var remoteEndpoint = new IPEndPoint(IPAddress.Any, 0);
             var data = udp.EndReceive(result, ref remoteEndpoint);
-
-            var request = Request.FromArray(data);
-            var response = Response.FromRequest(request);
-
-            foreach (var question in request.Questions)
-            {
-                var requestedDomain = question.Name;
-                var requestedType = question.Type;
-                
-                logger.Information("Requested resolve for {Type} {Domain} ", requestedType, requestedDomain);
-
-                if (requestedType != RecordType.A)
-                {
-                    throw new NotSupportedException("Resolving supported only for A records");
-                }
-                
-                var microCache = new Dictionary<string, IPAddress>();
-
-                try
-                {
-                    var requestedIpAddress = await resolver.Resolve(requestedDomain.ToString(), microCache);
-                    response.AnswerRecords.Add(new IPAddressResourceRecord(requestedDomain, requestedIpAddress));
-                    logger.Information("{Type} {Domain} resolved", requestedType, requestedDomain);
-                }
-                catch (ResolveFailedException e)
-                {
-                    response.ResponseCode = ResponseCode.Refused;
-                    logger.Warning(e, "{Type} {Domain} resolve failed", requestedType, requestedDomain);
-                }
-            }
-
-            await udp.SendAsync(response.ToArray(), remoteEndpoint);
+            HandleData(data, udp, remoteEndpoint);
         }
         catch (Exception e)
         {
