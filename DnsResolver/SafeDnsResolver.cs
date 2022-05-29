@@ -35,7 +35,7 @@ public sealed class SafeDnsResolver
         _logger = Log.Logger.ForContext<SafeDnsResolver>();
     }
 
-    public async Task<IPAddress> Resolve(string domain, Dictionary<string, IPAddress> microCache)
+    public async Task<IPAddress> Resolve(string domain, RecordType type, Dictionary<string, IPAddress> microCache)
     {
         _dnsClient.Requests = 0;
         if (_config.ContainsKey(domain))
@@ -45,14 +45,14 @@ public sealed class SafeDnsResolver
             return configIpAddress;
         }
 
-        var (authorityIpAddress, domainIpAddress) = await ResolveAuthorityIpAddress(domain, microCache);
+        var (authorityIpAddress, domainIpAddress) = await ResolveAuthorityIpAddress(domain, type, microCache);
 
-        domainIpAddress ??= await ResolveDomainIpAddress(domain, authorityIpAddress);
+        domainIpAddress ??= await ResolveDomainIpAddress(domain, type, authorityIpAddress);
 
         return domainIpAddress;
     }
 
-    private async Task<IPAddress> ResolveDomainIpAddress(string domain, IPAddress authorityIpAddress)
+    private async Task<IPAddress> ResolveDomainIpAddress(string domain, RecordType type, IPAddress authorityIpAddress)
     {
         if (_dnsClient.Requests > 100)
         {
@@ -63,7 +63,7 @@ public sealed class SafeDnsResolver
         var response = await _dnsClient.SendAsync(request, authorityIpAddress);
 
         var domainIpAddresses = response.AnswerRecords
-            .Where(x => x.Type == RecordType.A)
+            .Where(x => x.Type == type)
             .OfType<IPAddressResourceRecord>()
             .Select(x => x.IPAddress)
             .ToList();
@@ -97,6 +97,7 @@ public sealed class SafeDnsResolver
             )>
         ResolveAuthorityIpAddress(
             string domain,
+            RecordType type,
             Dictionary<string, IPAddress> microCache
         )
     {
@@ -206,12 +207,12 @@ public sealed class SafeDnsResolver
                             }
                             else
                             {
-                                authorityIpAddress = await Resolve(soaDomain, microCache);
+                                authorityIpAddress = await Resolve(soaDomain, type, microCache);
                             }
                         }
 
 
-                        var domainIpAddress = await ResolveDomainIpAddress(cnameDomain, authorityIpAddress);
+                        var domainIpAddress = await ResolveDomainIpAddress(cnameDomain, type, authorityIpAddress);
 
                         _logger.Debug(
                             "[{Domain}] Found cname {CnameDomain} with SOA {SoaDomain}, resolved to authority {AuthorityIpAddress} and domain {DomainIpAddress}",
@@ -222,9 +223,9 @@ public sealed class SafeDnsResolver
                     else
                     {
                         var (authorityIpAddress, domainIpAddress) =
-                            await ResolveAuthorityIpAddress(cnameDomain, microCache);
+                            await ResolveAuthorityIpAddress(cnameDomain, type, microCache);
 
-                        domainIpAddress ??= await ResolveDomainIpAddress(cnameDomain, authorityIpAddress);
+                        domainIpAddress ??= await ResolveDomainIpAddress(cnameDomain, type, authorityIpAddress);
 
                         _logger.Debug(
                             "[{Domain}] Found cname {CnameDomain}, resolved to authority {AuthorityIpAddress} and domain {DomainIpAddress}",
@@ -253,7 +254,7 @@ public sealed class SafeDnsResolver
                             }
                             else
                             {
-                                authorityIpAddress = await Resolve(soaDomain, microCache);
+                                authorityIpAddress = await Resolve(soaDomain, type, microCache);
                             }
                         }
 
@@ -270,7 +271,7 @@ public sealed class SafeDnsResolver
                         }
 
                         var authorityDomain = ChooseRandom(authorityDomains);
-                        var authorityIpAddress = await Resolve(authorityDomain, microCache);
+                        var authorityIpAddress = await Resolve(authorityDomain, type, microCache);
                         currentAuthorityIpAddress = authorityIpAddress;
 
                         _logger.Debug(

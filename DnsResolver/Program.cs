@@ -49,16 +49,16 @@ async void HandleData(byte[] data, UdpClient udp, IPEndPoint? remoteEndpoint)
 
             logger.Information("Requested resolve for {Type} {Domain} ", requestedType, requestedDomain);
 
-            if (requestedType != RecordType.A)
-            {
-                throw new NotSupportedException("Resolving supported only for A records");
-            }
+            // if (requestedType != RecordType.A)
+            // {
+            //     throw new NotSupportedException("Resolving supported only for A records");
+            // }
 
             var microCache = new Dictionary<string, IPAddress>();
 
             try
             {
-                var requestedIpAddress = await resolver.Resolve(requestedDomain.ToString(), microCache);
+                var requestedIpAddress = await resolver.Resolve(requestedDomain.ToString(), requestedType, microCache);
                 response.AnswerRecords.Add(new IPAddressResourceRecord(requestedDomain, requestedIpAddress));
                 logger.Information("{Type} {Domain} resolved", requestedType, requestedDomain);
             }
